@@ -36,7 +36,8 @@ the product or bounded context name. Replace both with your own.
   mutated after construction, consumed by reflection or serialization, or requires derivation
   with guard clauses.
 - No XML doc comments (`///`). Names and tests are the documentation.
-- No `var`. Always use explicit types.
+- No `var`. Always use explicit types. This applies to production code. Test projects are the one
+  exception, where `var` and camelCase locals are the norm.
 - PascalCase for classes, methods, properties, fields, parameters, and locals.
 - No em dashes in comments or documentation. Use commas, periods, or restructured sentences.
 - Never change code that was not explicitly requested: no reformatting, no casing changes,
@@ -527,7 +528,7 @@ public static class OrderStatusMapper
 
 ## What not to do
 
-- No `var`.
+- No `var` in production code.
 - No Entity Framework, no LINQ to SQL, no lazy loading.
 - No Dapper.Contrib, Dapper.SimpleCRUD, or query builder libraries.
 - No SQL string interpolation with runtime values. Parameters, always.

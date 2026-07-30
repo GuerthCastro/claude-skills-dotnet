@@ -1,74 +1,191 @@
-# .NET Agent Skills
+# Installation
 
-You already told the agent how you write code. Yesterday, in another chat, in detail. Then the
-session ended and it went back to suggesting Entity Framework and `var` everywhere.
+Each skill is a folder with one `SKILL.md` inside. Nothing to compile, no dependencies. You are
+copying folders into a directory the agent already watches.
 
-These are four skills that make that explanation permanent. Drop them in a directory and the
-agent picks them up on its own, in the right moment, without you pasting a wall of rules into
-every conversation.
+Pick your tool:
 
-## What a skill is
+- [Claude Code](#claude-code) (terminal, IDE extensions, desktop Code tab)
+- [Claude apps](#claude-apps-web-desktop-mobile) (web, desktop, mobile)
+- [Other agents](#other-agents)
 
-A folder with one `SKILL.md` inside. Markdown, plus a bit of YAML at the top saying what the
-skill covers and when it applies. The agent reads that header, decides whether the current task
-matches, and loads the body only if it does.
+---
 
-No install, no dependencies, no build step. If you can read Markdown, you can audit every line
-of what your agent is about to follow, which is more than can be said for most tooling that
-touches your code.
+## Claude Code
 
-## The four skills
+Two locations, chosen by scope:
 
-| Skill | What it does |
-| --- | --- |
-| [`dotnet10-conventions`](./dotnet10-conventions) | The rules I actually work by: one type per file, file scoped namespaces, primary constructors, no `var`, plain Dapper with hand written SQL, versioned migration scripts, `long` keys with a `Guid` for the outside world, soft deletes, a single LookUp table for every catalog, Clean Architecture layering that is enforced rather than described. |
-| [`solid-review`](./solid-review) | Turns "review this" into an actual audit. Five principles, one verdict each, violations ranked Critical over Major over Minor, and a refactored version for anything serious. It also checks layering, because a class can satisfy all five principles and still have a handler reaching into `HttpContext`. |
-| [`dotnet10-testing`](./dotnet10-testing) | How the tests get written: xUnit with no `[Theory]`, Moq for collaborators, Bogus fakers as real classes in a shared test project, AwesomeAssertions, result objects instead of thrown exceptions, and repository tests that hit a real disposable SQLite file rather than a mocked connection. |
-| [`csharp14-dotnet10-features`](./csharp14-dotnet10-features) | Stops the agent from writing 2019 C# in a `net10.0` project. The `field` keyword, extension blocks, null conditional assignment, partial constructors, file based apps, LINQ `LeftJoin`, Central Package Management, and the breaking change that bites anyone who ever named a local variable `field`. |
+| Location | Scope | Use when |
+| --- | --- | --- |
+| `~/.claude/skills/` | Every project on your machine | These are your personal conventions. |
+| `.claude/skills/` | One repository | The team should get them from source control. |
 
-## Install
+Worth knowing before you pick: when the same skill name exists in both, **personal wins over
+project**. That is the opposite of what most people assume, and it is the usual explanation for
+editing a skill in a repo and seeing no change in behavior. Enterprise policy, in turn,
+overrides personal.
+
+Skills also load from nested `.claude/skills/` directories below your working directory, so a
+package inside a monorepo can ship skills that only apply while Claude is working on that
+package.
+
+### Step 1: get the files
 
 ```bash
 git clone https://github.com/GuerthCastro/claude-skills-dotnet.git
-mkdir -p ~/.claude/skills
-cp -r claude-skills-dotnet/{dotnet10-conventions,dotnet10-testing,solid-review,csharp14-dotnet10-features} ~/.claude/skills/
+cd claude-skills-dotnet
 ```
 
-That covers every project on your machine. For per project installs, the Claude apps, other
-agents, and the troubleshooting for when a skill refuses to load, see [INSTALL.md](./INSTALL.md).
+**Verify:** `ls` shows `dotnet10-conventions`, `dotnet10-testing`, `solid-review`, and
+`csharp14-dotnet10-features`, each containing a `SKILL.md`.
 
-One thing worth knowing before you fork: the `description` in the frontmatter is not
-documentation, it is the trigger. It is the only part the agent reads before deciding whether
-the skill is relevant. Rewrite the body freely. Touch the description carefully.
+**No git on the machine:** use the green Code button on GitHub, download the ZIP, extract it. The
+folder structure is what matters, not how it got there.
 
-## About the opinions
+### Step 2: copy the skills into place
 
-`dotnet10-conventions` is not a survey of best practices. It is what I do, and some of it is
-genuinely arguable.
+Personal, available in every project:
 
-Banning `var` costs keystrokes and buys readability in code review, which is where I spend more
-time than in the editor. Banning Entity Framework means writing SQL by hand, which is slower on
-day one and predictable on day four hundred, when a query plan matters more than a fluent API.
-PascalCase for locals is a habit from a codebase I no longer maintain, and I kept it because
-consistency beats being right about casing.
+```bash
+mkdir -p ~/.claude/skills
+cp -r dotnet10-conventions dotnet10-testing solid-review csharp14-dotnet10-features ~/.claude/skills/
+```
 
-If a rule does not fit your team, delete it. Nothing here is load bearing for the other rules,
-and a fork with your name on it is worth more than a config file you argue with.
+Per project, committed with the repository:
 
-`dotnet10-testing` is opinionated in the same way, but it has a different pedigree: it was
-extracted from a real suite of 675 tests rather than written from memory, so every rule in it is
-one I already live with.
+```bash
+mkdir -p /path/to/your/project/.claude/skills
+cp -r dotnet10-conventions dotnet10-testing solid-review csharp14-dotnet10-features /path/to/your/project/.claude/skills/
+```
 
-`solid-review` and `csharp14-dotnet10-features` are close to neutral. Those two should be useful
-as they are.
+Windows PowerShell:
 
-## Contributing
+```powershell
+New-Item -ItemType Directory -Force "$HOME\.claude\skills"
+Copy-Item -Recurse dotnet10-conventions,dotnet10-testing,solid-review,csharp14-dotnet10-features "$HOME\.claude\skills\"
+```
 
-Issues and pull requests are welcome, particularly for the feature reference, since .NET moves
-faster than any single person can track. For the conventions skill, expect me to be stubborn
-about the rules and receptive about the examples.
+**Verify:** the tree looks exactly like this, with `SKILL.md` one level below the skill folder:
 
-## License and author
+```
+~/.claude/skills/
+├── csharp14-dotnet10-features/
+│   └── SKILL.md
+├── dotnet10-conventions/
+│   └── SKILL.md
+├── dotnet10-testing/
+│   └── SKILL.md
+└── solid-review/
+    └── SKILL.md
+```
 
-MIT. Written and maintained by [Guerth Castro](https://github.com/GuerthCastro).
-Use them, fork them, sell what you build with them. Just leave the copyright notice in place.
+When a skill does not load, this is almost always why. The two ways to get it wrong:
+
+- One level too deep: `~/.claude/skills/claude-skills-dotnet/solid-review/SKILL.md`. Move the
+  skill folders up.
+- The `SKILL.md` copied without its folder: `~/.claude/skills/SKILL.md`. A bare `SKILL.md` with
+  no parent folder is not scanned. The folder name is the skill identity.
+
+### Step 3: confirm the agent sees them
+
+**Verify:** open Claude Code in a .NET project and ask it to review a class for SOLID compliance,
+or ask what is new in C# 14. The right skill should be picked up on its own, because that is what
+its `description` is written for.
+
+**If nothing happens:**
+
+1. Restart Claude Code. Cheap, and it rules out anything related to when the directory appeared.
+2. Check the frontmatter: the file opens with `---`, contains `name` and `description`, and closes
+   with `---`. A tab character or an unquoted colon inside the description invalidates the block
+   and the skill is skipped silently.
+3. Confirm the `name` in the frontmatter matches the folder name.
+4. Ask for the skill by name. If it works when named but never triggers on its own, installation
+   is fine and the issue is the wording of the description.
+5. If you installed per project and nothing changed, check whether an older copy of the same skill
+   is sitting in `~/.claude/skills/`. Personal wins.
+
+One caveat that catches people: Cowork sessions and cloud sessions do not read `~/.claude/skills/`
+from your machine. They load the skills enabled for your account, and cloud sessions additionally
+load project skills committed to the cloned repository. A personal only install will look missing
+there.
+
+---
+
+## Claude apps (web, desktop, mobile)
+
+Custom skills are uploaded as ZIP files through **Settings > Features**, on the Pro, Max, Team,
+and Enterprise plans with code execution enabled. Check that first, since without it the section
+below does not apply.
+
+### Step 1: build the archives
+
+One ZIP per skill, with the skill folder at the root of the archive:
+
+```bash
+zip -r dotnet10-conventions.zip dotnet10-conventions
+zip -r dotnet10-testing.zip dotnet10-testing
+zip -r solid-review.zip solid-review
+zip -r csharp14-dotnet10-features.zip csharp14-dotnet10-features
+```
+
+On Windows, right click the folder and choose Send to > Compressed (zipped) folder.
+
+**Verify:** `unzip -l solid-review.zip` lists `solid-review/SKILL.md`. If it lists a bare
+`SKILL.md` with no folder prefix, you zipped the contents instead of the folder. Redo it from the
+parent directory.
+
+### Step 2: upload
+
+Settings > Features > custom skills, then upload each ZIP.
+
+**Verify:** each skill appears in the list with the description shown in this repository.
+
+**If an upload is rejected:** the apps validate more strictly than Claude Code does. In practice
+the cause is almost always the archive structure from step 1, so check that before rewriting any
+frontmatter.
+
+---
+
+## Other agents
+
+`SKILL.md` is an open format, and other agents read it directly. Consult that tool for its skills
+directory, since the path differs. Nothing in these skills depends on Claude specific
+features: no scripts, no bundled resources, no tool restrictions, just Markdown.
+
+---
+
+## Updating
+
+```bash
+cd claude-skills-dotnet
+git pull
+cp -r dotnet10-conventions dotnet10-testing solid-review csharp14-dotnet10-features ~/.claude/skills/
+```
+
+Better, if you plan to follow the repo: symlink instead of copying, and `git pull` becomes the
+whole update procedure.
+
+```bash
+ln -s "$(pwd)/solid-review" ~/.claude/skills/solid-review
+```
+
+On Windows, the equivalent is `mklink /D` from an elevated prompt, or `New-Item -ItemType
+SymbolicLink` in PowerShell with Developer Mode enabled.
+
+## Uninstalling
+
+```bash
+rm -rf ~/.claude/skills/dotnet10-conventions \
+       ~/.claude/skills/dotnet10-testing \
+       ~/.claude/skills/solid-review \
+       ~/.claude/skills/csharp14-dotnet10-features
+```
+
+In the Claude apps, remove them from Settings > Features.
+
+## Reference
+
+The official documentation is the authority whenever something here goes stale:
+
+- Agent Skills overview: https://platform.claude.com/docs/en/agents-and-tools/agent-skills/overview
+- Skills in Claude Code: https://code.claude.com/docs/en/skills
