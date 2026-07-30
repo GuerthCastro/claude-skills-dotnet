@@ -289,7 +289,6 @@ Dapper rules:
 - Materialize before returning. `QueryAsync` is buffered by default, so return
   `IReadOnlyList<T>`, not the raw `IEnumerable<T>`, and never leak a live reader past the
   connection scope.
-- No Dapper.Contrib, no Dapper.SimpleCRUD, no query builders. Hand written SQL is the point.
 - No stored procedures for CRUD. Reserve them for set based work that genuinely belongs in the
   database.
 - Repositories return domain entities, never DTOs. Mapping to DTOs happens in Application.
@@ -523,21 +522,35 @@ public static class OrderStatusMapper
 ## Solution file
 
 - Prefer the `.slnx` format on Visual Studio 2026 and current SDKs.
-- Solution folder `Name` attributes start and end with a slash: `Name="/01 - Application/"`.
-- Standard folders: `01 - Application`, `02 - Documentation`, `03 - Workflows`, `04 - Tests`.
+- Solution folder `Name` attributes start and end with a slash: `Name="/Source/"`.
+- Standard folders:
+
+```
+Source          # Api, Application, Domain, Infrastructure
+Tests           # every test project
+Documentation   # architecture notes, decision records, diagrams
+Pipelines       # CI definitions, Dockerfiles, deployment manifests
+```
+
+- No numeric prefixes. A prefix encodes ordering into the name itself, so inserting a folder means
+  renaming its neighbours, and the number carries no meaning to anyone reading a path in a stack
+  trace or a build log. Four folders sort readably on their own.
+- `Source`, not `Application`. The solution folder holds all four layers, and one of them is
+  already named Application. A folder named after one of its own children is a reliable source
+  of confusion in a large solution.
+- `Pipelines`, not a provider specific name. The contents differ between GitHub Actions, Azure
+  Pipelines, and GitLab CI, but the slot in the solution is the same, and renaming solution
+  folders across active branches causes merge noise for no benefit.
 
 ## What not to do
 
-- No `var` in production code.
-- No Entity Framework, no LINQ to SQL, no lazy loading.
-- No Dapper.Contrib, Dapper.SimpleCRUD, or query builder libraries.
+- No Entity Framework.
 - No SQL string interpolation with runtime values. Parameters, always.
 - No `using Dapper;` outside Infrastructure.
 - No block-style namespaces.
 - No XML doc comments.
 - No separate catalog tables. Use the LookUp pattern.
 - No physical deletes. Soft delete via `IsDeleted`.
-- No `Guid` foreign keys. Use `long` internally and expose `EntityKey`.
 - No schema generated from code at startup. Versioned scripts, applied by a runner.
 - No em dashes in comments or documentation.
 - No unrequested edits bundled into a requested change.

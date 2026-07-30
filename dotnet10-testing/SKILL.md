@@ -718,15 +718,18 @@ your call, not this skill's.
 ## What not to do
 
 - No MSTest, no NUnit, no second runner alongside xUnit.
-- No `[Theory]` whose body branches to decide what to assert. Split it into `[Fact]` methods instead.
-- No native xUnit assertions. AwesomeAssertions only.
-- No `Assert.Throws` or exception based expectations. Assert on result objects.
+- No native xUnit assertions, `Assert.Throws` and `Record.Exception` included. Everything goes
+  through the fluent API, throws among them: `act.Should().Throw<T>()`.
+- No catching an expected application failure. Assert on the result object instead.
 - No `MockBehavior.Strict`.
-- No mocked database connections in repository tests.
-- No inline `Faker<T>` inside a test method.
+- No mocked connection in a repository that owns its SQL. Mocking is for repositories that only
+  call stored procedures.
+- No `Faker<T>` built inline inside a test method. A faker is a class in the shared project or a
+  field wired in `SetupFakers()`.
 - No assertions on randomly generated values.
 - No fixed seeds hiding a test that depends on specific data.
 - No hand written stubs where a mock or the real object will do.
-- No DI container, no `WebApplicationFactory`, no shared fixtures.
-- No `.Result` or `.Wait()` outside a test base constructor.
-- No test class covering more than one production class.
+- No DI container and no `WebApplicationFactory`.
+- No `.Result` and no `.Wait()`. When setup has to be async, that is what `IAsyncLifetime` is for.
+- No test class covering unrelated production classes. Closely related domain types can share one
+  test class, with the type name prefixing each method.
