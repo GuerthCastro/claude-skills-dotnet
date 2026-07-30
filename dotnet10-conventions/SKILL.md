@@ -6,7 +6,7 @@ description: >
   instead of var, POCO entities with hand written SQL, versioned migration scripts, soft
   deletes, and a single LookUp catalog table. Use this skill whenever writing, reviewing,
   refactoring, or scaffolding C# code, solution structures, entities, repositories,
-  services, handlers, DTOs, mappers, validators, or tests for a .NET 10 project that
+  services, handlers, DTOs, mappers, or validators for a .NET 10 project that
   follows these conventions. Also use when creating a new project from scratch, migrating
   an existing one, or adding a new layer to an existing solution. Apply these conventions
   without exception unless the user explicitly overrides a rule for a specific case.
@@ -518,17 +518,6 @@ public static class OrderStatusMapper
   endpoint anonymous because it is "only dev".
 - Controllers are thin: model binding, authorization, delegation to a handler, status code.
 - Route parameters carry `EntityKey`, never `Id`.
-
-## Tests
-
-- MSTest as the default framework.
-- Moq for mocking, Bogus for test data, AwesomeAssertions for assertions.
-- One test file per class under test.
-- Class naming: `{ClassName}Tests`.
-- Method naming: `{MethodName}_Should{ExpectedBehavior}_When{Condition}`.
-- Repository tests run against a real database, not a mocked `IDbConnection`. Hand written SQL
-  is exactly the part a mock cannot verify. Use a container or a disposable local database, and
-  apply the migration scripts as part of the fixture.
 
 ## Solution file
 

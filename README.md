@@ -1,38 +1,74 @@
-# .NET 10 Skills
+# .NET Agent Skills
 
-Opinionated Claude skills for .NET 10 development, written and maintained by
-[Guerth Castro](https://github.com/GuerthCastro): C# conventions, SOLID and Clean Architecture
-review, and a C# 14 / .NET 10 feature reference.
+You already told the agent how you write code. Yesterday, in another chat, in detail. Then the
+session ended and it went back to suggesting Entity Framework and `var` everywhere.
 
-Author: Guerth Castro. License: MIT.
+These are four skills that make that explanation permanent. Drop them in a directory and the
+agent picks them up on its own, in the right moment, without you pasting a wall of rules into
+every conversation.
 
-## Skills
+## What a skill is
+
+A folder with one `SKILL.md` inside. Markdown, plus a bit of YAML at the top saying what the
+skill covers and when it applies. The agent reads that header, decides whether the current task
+matches, and loads the body only if it does.
+
+No install, no dependencies, no build step. If you can read Markdown, you can audit every line
+of what your agent is about to follow, which is more than can be said for most tooling that
+touches your code.
+
+## The four skills
 
 | Skill | What it does |
 | --- | --- |
-| [`dotnet10-conventions`](./dotnet10-conventions) | Strict C# and .NET 10 conventions: one type per file, file scoped namespaces, primary constructors, no `var`, Dapper only, attribute driven entities, soft deletes, LookUp catalog pattern, Clean Architecture layout. |
-| [`solid-review`](./solid-review) | Audits C#, TypeScript, or Angular code against the five SOLID principles plus Clean Architecture layering, and returns a severity ranked report with refactorings. |
-| [`csharp14-dotnet10-features`](./csharp14-dotnet10-features) | Feature reference for C# 14 and .NET 10: `field` keyword, extension blocks, null conditional assignment, partial constructors, file based apps, LINQ `LeftJoin`, Central Package Management. |
+| [`dotnet10-conventions`](./dotnet10-conventions) | The rules I actually work by: one type per file, file scoped namespaces, primary constructors, no `var`, plain Dapper with hand written SQL, versioned migration scripts, `long` keys with a `Guid` for the outside world, soft deletes, a single LookUp table for every catalog, Clean Architecture layering that is enforced rather than described. |
+| [`solid-review`](./solid-review) | Turns "review this" into an actual audit. Five principles, one verdict each, violations ranked Critical over Major over Minor, and a refactored version for anything serious. It also checks layering, because a class can satisfy all five principles and still have a handler reaching into `HttpContext`. |
+| [`dotnet10-testing`](./dotnet10-testing) | How the tests get written: xUnit with no `[Theory]`, Moq for collaborators, Bogus fakers as real classes in a shared test project, AwesomeAssertions, result objects instead of thrown exceptions, and repository tests that hit a real disposable SQLite file rather than a mocked connection. |
+| [`csharp14-dotnet10-features`](./csharp14-dotnet10-features) | Stops the agent from writing 2019 C# in a `net10.0` project. The `field` keyword, extension blocks, null conditional assignment, partial constructors, file based apps, LINQ `LeftJoin`, Central Package Management, and the breaking change that bites anyone who ever named a local variable `field`. |
 
-## Installation
-
-Quick version, for Claude Code on every project:
+## Install
 
 ```bash
 git clone https://github.com/GuerthCastro/claude-skills-dotnet.git
 mkdir -p ~/.claude/skills
-cp -r claude-skills-dotnet/{dotnet10-conventions,solid-review,csharp14-dotnet10-features} ~/.claude/skills/
+cp -r claude-skills-dotnet/{dotnet10-conventions,dotnet10-testing,solid-review,csharp14-dotnet10-features} ~/.claude/skills/
 ```
 
-For per project installs, the Claude apps, verification, and troubleshooting, see
-[INSTALL.md](./INSTALL.md).
+That covers every project on your machine. For per project installs, the Claude apps, other
+agents, and the troubleshooting for when a skill refuses to load, see [INSTALL.md](./INSTALL.md).
 
-Each skill is a folder containing a single `SKILL.md` with YAML frontmatter. Claude loads the
-`description` to decide when the skill applies, so keep it intact if you fork.
+One thing worth knowing before you fork: the `description` in the frontmatter is not
+documentation, it is the trigger. It is the only part the agent reads before deciding whether
+the skill is relevant. Rewrite the body freely. Touch the description carefully.
 
-## A note on opinions
+## About the opinions
 
-`dotnet10-conventions` is deliberately strict. Rules like banning `var` and Entity Framework are
-personal choices that have paid off in the codebases I maintain, not universal truths. Fork it
-and change the rules you disagree with. `solid-review` and `csharp14-dotnet10-features` are
-close to neutral and should be useful as they are.
+`dotnet10-conventions` is not a survey of best practices. It is what I do, and some of it is
+genuinely arguable.
+
+Banning `var` costs keystrokes and buys readability in code review, which is where I spend more
+time than in the editor. Banning Entity Framework means writing SQL by hand, which is slower on
+day one and predictable on day four hundred, when a query plan matters more than a fluent API.
+PascalCase for locals is a habit from a codebase I no longer maintain, and I kept it because
+consistency beats being right about casing.
+
+If a rule does not fit your team, delete it. Nothing here is load bearing for the other rules,
+and a fork with your name on it is worth more than a config file you argue with.
+
+`dotnet10-testing` is opinionated in the same way, but it has a different pedigree: it was
+extracted from a real suite of 675 tests rather than written from memory, so every rule in it is
+one I already live with.
+
+`solid-review` and `csharp14-dotnet10-features` are close to neutral. Those two should be useful
+as they are.
+
+## Contributing
+
+Issues and pull requests are welcome, particularly for the feature reference, since .NET moves
+faster than any single person can track. For the conventions skill, expect me to be stubborn
+about the rules and receptive about the examples.
+
+## License and author
+
+MIT. Written and maintained by [Guerth Castro](https://github.com/GuerthCastro).
+Use them, fork them, sell what you build with them. Just leave the copyright notice in place.
