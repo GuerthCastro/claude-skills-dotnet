@@ -1,9 +1,9 @@
 # .NET Agent Skills
 
 You already told the agent how you write code. Yesterday, in another chat, in detail. Then the
-session ended and it went back to suggesting Entity Framework and `var` everywhere.
+session ended and it went back to suggesting Entity Framework and a repository per screen.
 
-These are four skills that make that explanation permanent. Drop them in a directory and the
+These are five skills that make that explanation permanent. Drop them in a directory and the
 agent picks them up on its own, in the right moment, without you pasting a wall of rules into
 every conversation.
 
@@ -17,13 +17,14 @@ No install, no dependencies, no build step. If you can read Markdown, you can au
 of what your agent is about to follow, which is more than can be said for most tooling that
 touches your code.
 
-## The four skills
+## The five skills
 
 | Skill | What it does |
 | --- | --- |
-| [`dotnet10-conventions`](./dotnet10-conventions) | The rules I actually work by: one type per file, file scoped namespaces, primary constructors, no `var`, plain Dapper with hand written SQL, versioned migration scripts, `long` keys with a `Guid` for the outside world, soft deletes, a single LookUp table for every catalog, Clean Architecture layering that is enforced rather than described. |
+| [`dotnet10-conventions`](./dotnet10-conventions) | The rules I actually work by: one type per file, file scoped namespaces, primary constructors, camelCase locals and fields with no underscore prefix, plain Dapper with hand written SQL, versioned migration scripts, `long` keys with a `Guid` for the outside world, soft deletes, a single LookUp table for every catalog, Clean Architecture layering that is enforced rather than described. |
+| [`classic-asp-to-aspnet-mvc`](./classic-asp-to-aspnet-mvc) | The playbook for porting a Classic ASP or Web Forms site to ASP.NET Core MVC without carrying its structure across: where inline logic goes, options classes instead of raw configuration keys, user secrets locally and Key Vault in production, and the ordering that keeps the site working through the whole migration. |
 | [`solid-review`](./solid-review) | Turns "review this" into an actual audit. Five principles, one verdict each, violations ranked Critical over Major over Minor, and a refactored version for anything serious. It also checks layering, because a class can satisfy all five principles and still have a handler reaching into `HttpContext`. |
-| [`dotnet10-testing`](./dotnet10-testing) | How the tests get written: xUnit with no `[Theory]`, Moq for collaborators, Bogus fakers as real classes in a shared test project, AwesomeAssertions, result objects instead of thrown exceptions, and repository tests that hit a real disposable SQLite file rather than a mocked connection. |
+| [`dotnet10-testing`](./dotnet10-testing) | How the tests get written: xUnit with `[Theory]` reserved for variants that differ only in input values, Moq for collaborators, Bogus fakers as real classes in a shared test project, AwesomeAssertions, result objects instead of thrown exceptions, and repository tests that hit the real engine in a disposable container rather than a mocked connection. |
 | [`csharp14-dotnet10-features`](./csharp14-dotnet10-features) | Stops the agent from writing 2019 C# in a `net10.0` project. The `field` keyword, extension blocks, null conditional assignment, partial constructors, file based apps, LINQ `LeftJoin`, Central Package Management, and the breaking change that bites anyone who ever named a local variable `field`. |
 
 ## Install
@@ -31,7 +32,7 @@ touches your code.
 ```bash
 git clone https://github.com/GuerthCastro/claude-skills-dotnet.git
 mkdir -p ~/.claude/skills
-cp -r claude-skills-dotnet/{dotnet10-conventions,dotnet10-testing,solid-review,csharp14-dotnet10-features} ~/.claude/skills/
+cp -r claude-skills-dotnet/{dotnet10-conventions,classic-asp-to-aspnet-mvc,dotnet10-testing,solid-review,csharp14-dotnet10-features} ~/.claude/skills/
 ```
 
 That covers every project on your machine. For per project installs, the Claude apps, other
@@ -46,11 +47,17 @@ the skill is relevant. Rewrite the body freely. Touch the description carefully.
 `dotnet10-conventions` is not a survey of best practices. It is what I do, and some of it is
 genuinely arguable.
 
-Banning `var` costs keystrokes and buys readability in code review, which is where I spend more
-time than in the editor. Banning Entity Framework means writing SQL by hand, which is slower on
-day one and predictable on day four hundred, when a query plan matters more than a fluent API.
-PascalCase for locals is a habit from a codebase I no longer maintain, and I kept it because
-consistency beats being right about casing.
+Banning Entity Framework means writing SQL by hand, which is slower on day one and predictable on
+day four hundred, when a query plan matters more than a fluent API. Banning comments sounds
+absolute until you notice how often a comment is a rename that never happened, which is why the
+only ones left are `// Arrange`, `// Act`, and `// Assert`, and those mark structure rather than
+explain code.
+
+Two rules used to say the opposite of what I do, and they are worth naming because a rule that
+contradicts the code it governs is worse than no rule. The skill banned `var` outright and asked
+for PascalCase locals; both came from a codebase I no longer maintain. `var` is now the default,
+with an explicit type where the declared type carries weight, and locals, parameters, and private
+fields are camelCase with no underscore.
 
 If a rule does not fit your team, delete it. Nothing here is load bearing for the other rules,
 and a fork with your name on it is worth more than a config file you argue with.

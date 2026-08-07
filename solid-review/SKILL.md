@@ -43,22 +43,23 @@ Violations to look for:
 - A handler orchestrates several unrelated operations.
 - God classes with ten or more methods spanning multiple domains.
 
+**VIOLATION.** `OrderService` validates, persists, and notifies. The notification call is the one
+that does not belong.
+
 ```csharp
-// VIOLATION: OrderService validates, persists, and notifies
 public class OrderService(IOrderRepository repository, IEmailService email)
 {
-    public async Task<bool> AddItemAsync(long orderId, long productId)
+    public async Task<bool> AddItem(long orderId, long productId)
     {
-        Order order = await repository.GetByIdAsync(orderId);
+        Order order = await repository.GetById(orderId);
         if (order.ItemCount >= order.MaxItems)
         {
             return false;
         }
 
-        await repository.AddItemAsync(orderId, productId);
+        await repository.AddItem(orderId, productId);
 
-        // notification does not belong here
-        await email.SendOrderUpdatedAsync(orderId);
+        await email.SendOrderUpdated(orderId);
         return true;
     }
 }
@@ -77,8 +78,9 @@ Violations to look for:
 - Adding a new payment method requires editing the checkout handler.
 - Concrete dependencies where an abstraction belongs.
 
+**VIOLATION.** A new export format means editing this method.
+
 ```csharp
-// VIOLATION: a new export format means editing this method
 public byte[] ExportInvoice(string format, IEnumerable<InvoiceLine> lines)
 {
     if (format == "pdf")
@@ -121,15 +123,16 @@ Violations to look for:
   `Paginate`, `Search`, and `BulkInsert` onto every entity.
 - A service interface mixing reads and writes when consumers only need one side.
 
+**VIOLATION.** A read only reporting consumer is forced to see Create, Update, and Delete.
+
 ```csharp
-// VIOLATION: a read only reporting consumer is forced to see Create/Update/Delete
 public interface IOrderRepository
 {
-    Task<Order> GetByIdAsync(long id);
-    Task<IEnumerable<Order>> GetAllAsync();
-    Task CreateAsync(Order order);
-    Task UpdateAsync(Order order);
-    Task DeleteAsync(long id);
+    Task<Order> GetById(long id);
+    Task<IEnumerable<Order>> GetAll();
+    Task Create(Order order);
+    Task Update(Order order);
+    Task Delete(long id);
 }
 ```
 
@@ -146,14 +149,15 @@ Violations to look for:
 - The Application layer importing Infrastructure types.
 - Static service classes holding mutable state.
 
+**VIOLATION.** The handler builds its own concrete repository and connection.
+
 ```csharp
-// VIOLATION: the handler builds its own concrete repository and connection
 public class GetOrderHandler
 {
-    public async Task<OrderDto> HandleAsync(long id)
+    public async Task<OrderDto> Handle(long id)
     {
         OrderRepository repository = new(new SqlConnection("..."));
-        Order order = await repository.GetByIdAsync(id);
+        Order order = await repository.GetById(id);
         return order.MapToDto();
     }
 }

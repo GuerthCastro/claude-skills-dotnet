@@ -36,8 +36,8 @@ git clone https://github.com/GuerthCastro/claude-skills-dotnet.git
 cd claude-skills-dotnet
 ```
 
-**Verify:** `ls` shows `dotnet10-conventions`, `dotnet10-testing`, `solid-review`, and
-`csharp14-dotnet10-features`, each containing a `SKILL.md`.
+**Verify:** `ls` shows `dotnet10-conventions`, `classic-asp-to-aspnet-mvc`, `dotnet10-testing`,
+`solid-review`, and `csharp14-dotnet10-features`, each containing a `SKILL.md`.
 
 **No git on the machine:** use the green Code button on GitHub, download the ZIP, extract it. The
 folder structure is what matters, not how it got there.
@@ -48,27 +48,29 @@ Personal, available in every project:
 
 ```bash
 mkdir -p ~/.claude/skills
-cp -r dotnet10-conventions dotnet10-testing solid-review csharp14-dotnet10-features ~/.claude/skills/
+cp -r dotnet10-conventions classic-asp-to-aspnet-mvc dotnet10-testing solid-review csharp14-dotnet10-features ~/.claude/skills/
 ```
 
 Per project, committed with the repository:
 
 ```bash
 mkdir -p /path/to/your/project/.claude/skills
-cp -r dotnet10-conventions dotnet10-testing solid-review csharp14-dotnet10-features /path/to/your/project/.claude/skills/
+cp -r dotnet10-conventions classic-asp-to-aspnet-mvc dotnet10-testing solid-review csharp14-dotnet10-features /path/to/your/project/.claude/skills/
 ```
 
 Windows PowerShell:
 
 ```powershell
 New-Item -ItemType Directory -Force "$HOME\.claude\skills"
-Copy-Item -Recurse dotnet10-conventions,dotnet10-testing,solid-review,csharp14-dotnet10-features "$HOME\.claude\skills\"
+Copy-Item -Recurse dotnet10-conventions,classic-asp-to-aspnet-mvc,dotnet10-testing,solid-review,csharp14-dotnet10-features "$HOME\.claude\skills\"
 ```
 
 **Verify:** the tree looks exactly like this, with `SKILL.md` one level below the skill folder:
 
 ```
 ~/.claude/skills/
+├── classic-asp-to-aspnet-mvc/
+│   └── SKILL.md
 ├── csharp14-dotnet10-features/
 │   └── SKILL.md
 ├── dotnet10-conventions/
@@ -123,6 +125,7 @@ One ZIP per skill, with the skill folder at the root of the archive:
 
 ```bash
 zip -r dotnet10-conventions.zip dotnet10-conventions
+zip -r classic-asp-to-aspnet-mvc.zip classic-asp-to-aspnet-mvc
 zip -r dotnet10-testing.zip dotnet10-testing
 zip -r solid-review.zip solid-review
 zip -r csharp14-dotnet10-features.zip csharp14-dotnet10-features
@@ -159,7 +162,7 @@ features: no scripts, no bundled resources, no tool restrictions, just Markdown.
 ```bash
 cd claude-skills-dotnet
 git pull
-cp -r dotnet10-conventions dotnet10-testing solid-review csharp14-dotnet10-features ~/.claude/skills/
+cp -r dotnet10-conventions classic-asp-to-aspnet-mvc dotnet10-testing solid-review csharp14-dotnet10-features ~/.claude/skills/
 ```
 
 Better, if you plan to follow the repo: symlink instead of copying, and `git pull` becomes the
@@ -176,6 +179,7 @@ SymbolicLink` in PowerShell with Developer Mode enabled.
 
 ```bash
 rm -rf ~/.claude/skills/dotnet10-conventions \
+       ~/.claude/skills/classic-asp-to-aspnet-mvc \
        ~/.claude/skills/dotnet10-testing \
        ~/.claude/skills/solid-review \
        ~/.claude/skills/csharp14-dotnet10-features
