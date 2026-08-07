@@ -54,44 +54,45 @@ Three components:
 The composition root, in two halves. First the builder, where services are registered. Then the
 app, where middleware and routes are declared. Nothing else belongs here.
 
+`Program.cs`
+
 ```csharp
-// Program.cs
 using Acme.Site.Abstractions;
 using Acme.Site.Extensions;
 using Acme.Site.Options;
 using Acme.Site.Services;
 
-WebApplicationBuilder Builder = WebApplication.CreateBuilder(args);
+var builder = WebApplication.CreateBuilder(args);
 
-Builder.Configuration.AddKeyVaultSecretsWhenConfigured();
+builder.Configuration.AddKeyVaultSecretsWhenConfigured();
 
-Builder.Services.AddControllersWithViews();
+builder.Services.AddControllersWithViews();
 
-Builder.Services.AddValidatedOptions<ApiOptions>(Builder.Configuration.GetSection(ApiOptions.SectionName));
-Builder.Services.AddValidatedOptions<EmailOptions>(Builder.Configuration.GetSection(EmailOptions.SectionName));
+builder.Services.AddValidatedOptions<ApiOptions>(builder.Configuration.GetSection(ApiOptions.SectionName));
+builder.Services.AddValidatedOptions<EmailOptions>(builder.Configuration.GetSection(EmailOptions.SectionName));
 
-Builder.Services.AddTransient<IOrderRepository, OrderRepository>();
+builder.Services.AddTransient<IOrderRepository, OrderRepository>();
 
-WebApplication App = Builder.Build();
+var app = builder.Build();
 
-if (!App.Environment.IsDevelopment())
+if (!app.Environment.IsDevelopment())
 {
-    App.UseExceptionHandler("/Home/Error");
-    App.UseHsts();
+    app.UseExceptionHandler("/Home/Error");
+    app.UseHsts();
 }
 
-App.UseHttpsRedirection();
-App.UseRouting();
-App.UseAuthorization();
-App.MapStaticAssets();
+app.UseHttpsRedirection();
+app.UseRouting();
+app.UseAuthorization();
+app.MapStaticAssets();
 
-App.MapControllerRoute(name: "default", pattern: "{controller=Home}/{action=Index}/{id?}").WithStaticAssets();
+app.MapControllerRoute(name: "default", pattern: "{controller=Home}/{action=Index}/{id?}").WithStaticAssets();
 
-App.Run();
+app.Run();
 ```
 
 Registration order matters in exactly one place: any configuration source added to
-`Builder.Configuration` wins over the sources added before it. `CreateBuilder` has already added
+`builder.Configuration` wins over the sources added before it. `CreateBuilder` has already added
 `appsettings.json`, the environment override, user secrets in Development, and environment
 variables. Anything appended after that outranks all of them.
 
@@ -100,7 +101,7 @@ variables. Anything appended after that outranks all of them.
 The naive port reads keys inline, which is what most migration examples show:
 
 ```csharp
-string BaseUrl = Configuration["APIs:Billing"] ?? throw new InvalidOperationException("Missing configuration: APIs:Billing");
+string baseUrl = Configuration["APIs:Billing"] ?? throw new InvalidOperationException("Missing configuration: APIs:Billing");
 ```
 
 This works and it is still wrong for a codebase anyone else will touch. The key is a string
@@ -110,8 +111,9 @@ deployment setting.
 
 Bind a class per section instead. The section name lives as a constant on the type it describes:
 
+`Options/EmailOptions.cs`
+
 ```csharp
-// Options/EmailOptions.cs
 using System.ComponentModel.DataAnnotations;
 
 namespace Acme.Site.Options;
@@ -132,24 +134,25 @@ public sealed class EmailOptions
 Register it once, validated, through an extension that makes the two behaviours distinguishable
 by name:
 
+`Extensions/ServiceCollectionExtensions.cs`
+
 ```csharp
-// Extensions/ServiceCollectionExtensions.cs
 namespace Acme.Site.Extensions;
 
 public static class ServiceCollectionExtensions
 {
-    public static IServiceCollection AddValidatedOptions<TOptions>(this IServiceCollection Services, IConfiguration Section) where TOptions : class
+    public static IServiceCollection AddValidatedOptions<TOptions>(this IServiceCollection services, IConfiguration section) where TOptions : class
     {
-        Services.AddOptions<TOptions>().Bind(Section).ValidateDataAnnotations().ValidateOnStart();
+        services.AddOptions<TOptions>().Bind(section).ValidateDataAnnotations().ValidateOnStart();
 
-        return Services;
+        return services;
     }
 
-    public static IServiceCollection AddOptionsValidatedOnFirstUse<TOptions>(this IServiceCollection Services, IConfiguration Section) where TOptions : class
+    public static IServiceCollection AddOptionsValidatedOnFirstUse<TOptions>(this IServiceCollection services, IConfiguration section) where TOptions : class
     {
-        Services.AddOptions<TOptions>().Bind(Section).ValidateDataAnnotations();
+        services.AddOptions<TOptions>().Bind(section).ValidateDataAnnotations();
 
-        return Services;
+        return services;
     }
 }
 ```
@@ -157,7 +160,7 @@ public static class ServiceCollectionExtensions
 Consumers take `IOptions<T>` and the magic strings disappear:
 
 ```csharp
-public class HomeController(IOptions<EmailOptions> EmailOptions) : Controller
+public class HomeController(IOptions<EmailOptions> emailOptions) : Controller
 ```
 
 Data annotations buy more than presence checks. `[EmailAddress]`, `[Url]`, and `[Range]` catch
@@ -176,26 +179,28 @@ built on every request to that controller, so reading `IOptions<T>.Value` in its
 validates on every page load. If the option only matters at send time, hold the `IOptions<T>` and
 read `.Value` inside the method:
 
+`Services/EmailService.cs`
+
 ```csharp
-// Services/EmailService.cs
-public class EmailService(HttpClient Client, IOptions<TestingOptions> TestingOptions) : IEmailService
+public class EmailService(HttpClient client, IOptions<TestingOptions> testingOptions) : IEmailService
 {
-    public async Task<bool> SendAsync(string To, string Body, CancellationToken CancellationToken)
+    public async Task<bool> Send(string to, string body, CancellationToken cancellationToken)
     {
-        TestingOptions Testing = TestingOptions.Value;
-        string Recipient = Testing.InTesting ? Testing.TestEmail : To;
+        var testing = testingOptions.Value;
+        string recipient = testing.InTesting ? testing.TestEmail : to;
 
-        using HttpResponseMessage Response = await Client.PostAsync($"send?to={Recipient}", null, CancellationToken);
+        using var response = await client.PostAsync($"send?to={recipient}", null, cancellationToken);
 
-        return Response.IsSuccessStatusCode;
+        return response.IsSuccessStatusCode;
     }
 }
 ```
 
 Conditional rules go in `IValidatableObject`, which `ValidateDataAnnotations` honours:
 
+`Options/TestingOptions.cs`
+
 ```csharp
-// Options/TestingOptions.cs
 using System.ComponentModel.DataAnnotations;
 
 namespace Acme.Site.Options;
@@ -206,7 +211,7 @@ public sealed class TestingOptions : IValidatableObject
 
     public string TestEmail { get; set; } = string.Empty;
 
-    public IEnumerable<ValidationResult> Validate(ValidationContext ValidationContext)
+    public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
     {
         if (InTesting && string.IsNullOrWhiteSpace(TestEmail))
         {
@@ -229,8 +234,9 @@ In production, Azure Key Vault. Add `Azure.Extensions.AspNetCore.Configuration.S
 `Azure.Identity`, then register the provider conditionally so a developer without vault access can
 still run the app:
 
+`Extensions/ConfigurationManagerExtensions.cs`
+
 ```csharp
-// Extensions/ConfigurationManagerExtensions.cs
 using Azure.Identity;
 using Acme.Site.Options;
 
@@ -238,25 +244,25 @@ namespace Acme.Site.Extensions;
 
 public static class ConfigurationManagerExtensions
 {
-    public static ConfigurationManager AddKeyVaultSecretsWhenConfigured(this ConfigurationManager Configuration)
+    public static ConfigurationManager AddKeyVaultSecretsWhenConfigured(this ConfigurationManager configuration)
     {
-        KeyVaultOptions? KeyVault = Configuration.GetSection(KeyVaultOptions.SectionName).Get<KeyVaultOptions>();
+        var keyVault = configuration.GetSection(KeyVaultOptions.SectionName).Get<KeyVaultOptions>();
 
-        if (string.IsNullOrWhiteSpace(KeyVault?.Uri))
+        if (string.IsNullOrWhiteSpace(keyVault?.Uri))
         {
-            return Configuration;
+            return configuration;
         }
 
-        DefaultAzureCredentialOptions CredentialOptions = new();
+        DefaultAzureCredentialOptions credentialOptions = new();
 
-        if (!string.IsNullOrWhiteSpace(KeyVault.TenantId))
+        if (!string.IsNullOrWhiteSpace(keyVault.TenantId))
         {
-            CredentialOptions.TenantId = KeyVault.TenantId;
+            credentialOptions.TenantId = keyVault.TenantId;
         }
 
-        Configuration.AddAzureKeyVault(new Uri(KeyVault.Uri), new DefaultAzureCredential(CredentialOptions));
+        configuration.AddAzureKeyVault(new Uri(keyVault.Uri), new DefaultAzureCredential(credentialOptions));
 
-        return Configuration;
+        return configuration;
     }
 }
 ```
@@ -289,8 +295,9 @@ class, or leave it to the conventional route from `Program.cs` when the ported U
 Every action gets an explicit verb attribute. It documents the route and it stops a GET action from
 answering a POST:
 
+`Controllers/HomeController.cs`
+
 ```csharp
-// Controllers/HomeController.cs
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
 using Acme.Site.Abstractions;
@@ -299,28 +306,28 @@ using Acme.Site.Options;
 
 namespace Acme.Site.Controllers;
 
-public class HomeController(IOrderRepository OrderRepository, IOptions<EmailOptions> EmailOptions) : Controller
+public class HomeController(IOrderRepository orderRepository, IOptions<EmailOptions> emailOptions) : Controller
 {
     [HttpGet]
-    public async Task<IActionResult> Index(CancellationToken CancellationToken)
+    public async Task<IActionResult> Index(CancellationToken cancellationToken)
     {
-        IReadOnlyList<Order> Orders = await OrderRepository.GetRecentAsync(CancellationToken);
+        var orders = await orderRepository.GetRecent(cancellationToken);
 
-        IndexViewModel Model = new()
+        IndexViewModel model = new()
         {
-            Orders = Orders.ToList()
+            Orders = orders.ToList()
         };
 
-        return View("Index", Model);
+        return View("Index", model);
     }
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> Submit(IndexViewModel Model, CancellationToken CancellationToken)
+    public async Task<IActionResult> Submit(IndexViewModel model, CancellationToken cancellationToken)
     {
         if (!ModelState.IsValid)
         {
-            return View("Index", Model);
+            return View("Index", model);
         }
 
         return RedirectToAction(nameof(Thanks));
@@ -346,8 +353,9 @@ those properties `[BindNever]` so a crafted POST cannot set them.
 A view model is a normal model kept in `Models/ViewModels/`. It carries everything the view needs
 and nothing else:
 
+`Models/ViewModels/IndexViewModel.cs`
+
 ```csharp
-// Models/ViewModels/IndexViewModel.cs
 using System.ComponentModel.DataAnnotations;
 using Microsoft.AspNetCore.Mvc.ModelBinding;
 
@@ -382,9 +390,9 @@ every member.
 <span class="currentPage">@Model.Page</span>
 
 <select name="SelectedRoleId" required>
-    @foreach (RoleModel Role in Model.Roles)
+    @foreach (var role in Model.Roles)
     {
-        <option value="@Role.RoleId">@Role.Role</option>
+        <option value="@role.RoleId">@role.Role</option>
     }
 </select>
 ```
@@ -420,7 +428,7 @@ A repository holds the queries and returns models that mirror the shape of the r
 live in `Abstractions/`, one per file, and every repository is registered in `Program.cs`:
 
 ```csharp
-Builder.Services.AddTransient<IOrderRepository, OrderRepository>();
+builder.Services.AddTransient<IOrderRepository, OrderRepository>();
 ```
 
 Split by subject rather than by table. A repository per screen ends up duplicating queries; a
@@ -432,11 +440,11 @@ An external API gets a Service, registered as a typed `HttpClient`. Resolve opti
 provider so the base address comes from validated configuration:
 
 ```csharp
-Builder.Services.AddHttpClient<IBillingService, BillingService>((Provider, Client) =>
+builder.Services.AddHttpClient<IBillingService, BillingService>((provider, client) =>
 {
-    ApiOptions Apis = Provider.GetRequiredService<IOptions<ApiOptions>>().Value;
+    var apis = provider.GetRequiredService<IOptions<ApiOptions>>().Value;
 
-    Client.BaseAddress = new Uri(Apis.Billing);
+    client.BaseAddress = new Uri(apis.Billing);
 });
 ```
 
@@ -444,20 +452,21 @@ A Service returns models, exactly like a repository. Returning `HttpResponseMess
 transport concerns into the controller, which then inspects `IsSuccessStatusCode` and owns a
 lifetime it did not create:
 
-```csharp
-// Services/BillingService.cs
-public class BillingService(HttpClient Client, ILogger<BillingService> Logger) : IBillingService
-{
-    public async Task<bool> SubmitAsync(string Reference, CancellationToken CancellationToken)
-    {
-        using HttpResponseMessage Response = await Client.PostAsync($"submit?reference={Reference}", null, CancellationToken);
+`Services/BillingService.cs`
 
-        if (!Response.IsSuccessStatusCode)
+```csharp
+public class BillingService(HttpClient client, ILogger<BillingService> logger) : IBillingService
+{
+    public async Task<bool> Submit(string reference, CancellationToken cancellationToken)
+    {
+        using var response = await client.PostAsync($"submit?reference={reference}", null, cancellationToken);
+
+        if (!response.IsSuccessStatusCode)
         {
-            Logger.LogWarning("Billing submit returned {Status}.", (int)Response.StatusCode);
+            logger.LogWarning("Billing submit returned {Status}.", (int)response.StatusCode);
         }
 
-        return Response.IsSuccessStatusCode;
+        return response.IsSuccessStatusCode;
     }
 }
 ```
@@ -476,8 +485,31 @@ Order that keeps the site working throughout:
 2. Port pages as Views with hardcoded data. Confirm the markup renders, then wire the model.
 3. Move inline ASP database calls into repositories, one screen at a time.
 4. Move inline API calls into Services.
-5. Replace every configuration read with a bound options class.
-6. Move secrets to user secrets, then to Key Vault, then rotate them.
+5. Replace every configuration read with a bound options class, validated at startup.
+6. Move every secret out of `appsettings.json` into user secrets. Local development keeps working
+   and nothing sensitive is committed from here on.
+7. Wire Key Vault for the deployed environments:
+   1. Add `Azure.Extensions.AspNetCore.Configuration.Secrets` and `Azure.Identity`.
+   2. Add a `KeyVaultOptions` class carrying `Uri`, `TenantId`, and `ManagedIdentityClientId`.
+   3. Register the provider on the first line after `CreateBuilder`, conditional on a vault URI
+      being present, so a developer without vault access still runs the app on user secrets.
+   4. Put the vault URI in `appsettings.Production.json`, never in `appsettings.json`. The URI and
+      the tenant id are not secrets, so they are committed.
+   5. Create the secrets in the vault with `--` in place of every `:`.
+   6. Enable Managed Identity on the App Service and grant it **Key Vault Secrets User** on the
+      vault. Leave `ManagedIdentityClientId` empty unless the identity is user assigned.
+8. Rotate every secret that was ever committed, then load the new values into the vault. Emptying
+   the file does not remove the value from git history.
+9. Verify the three startup paths before deploying.
+
+The verification in step 9 is what catches a half configured vault, and it is worth doing
+explicitly rather than assuming:
+
+- Development with no vault URI: the app starts on user secrets and never reaches Azure.
+- Target environment with the vault reachable: the app starts, and a value that exists only in the
+  vault renders on a page.
+- Target environment with one secret removed: the app refuses to start and names the missing
+  option. If it starts anyway, the option is not registered with `ValidateOnStart`.
 
 Things that consistently bite:
 
@@ -494,6 +526,9 @@ Things that consistently bite:
   They are external contracts. Put them in constants, never rename them.
 - **URLs.** Conventional routing on `{controller=Home}/{action=Index}/{id?}` reproduces most ported
   paths. Adding route templates to make URLs prettier breaks inbound links.
+- **An incomplete vault.** The list of secrets someone reports having created is not evidence. Boot
+  the app against the vault with startup validation on, because that names anything missing in one
+  line and costs less than reading a portal screen carefully.
 
 ## What not to do
 
@@ -506,6 +541,8 @@ Things that consistently bite:
 - No route template added purely for aesthetics on a migrated URL.
 - No magic string at a call site where a named constant belongs.
 - No statement wrapped across lines when it fits on one, initializers and constructors aside.
-- No XML doc comments.
+- No XML doc comments and no inline comments, apart from `// Arrange`, `// Act`, and `// Assert`
+  in a test body.
+- No underscore prefix on a private field, and no `Async` or `Sync` suffix on a method you wrote.
 - No em dashes in comments or documentation.
 - No unrequested edits bundled into a requested change.

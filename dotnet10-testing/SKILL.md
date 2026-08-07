@@ -2,10 +2,11 @@
 name: dotnet10-testing
 description: >
   Opinionated unit testing conventions for .NET 10 solutions built on Clean Architecture and
-  Dapper: xUnit as the runner with no parameterized tests, Moq for collaborators, Bogus fakers
-  as dedicated builder classes in a shared test library, AwesomeAssertions for assertions,
-  result objects instead of thrown exceptions, and repository tests that run against a real
-  disposable SQLite database rather than a mocked connection. Use this skill whenever writing,
+  Dapper: xUnit as the runner with `[Theory]` reserved for variants that differ only in input
+  values, Moq for collaborators, Bogus fakers as dedicated builder classes in a shared test
+  library, AwesomeAssertions for assertions, result objects instead of thrown exceptions, and
+  repository tests that run against the real engine in a disposable container rather than a
+  mocked connection. Use this skill whenever writing,
   reviewing, or restructuring tests for a .NET project: service tests, controller tests,
   repository tests, test data builders, mocking strategy, test naming, or test project layout.
   Also use when setting up a test project from scratch or deciding what deserves a test at all.
@@ -26,7 +27,7 @@ Placeholders: `Acme` is the company prefix, `Product` is the product or bounded 
 
 | Package | Role |
 | --- | --- |
-| `xunit` | The runner. `[Fact]` only. |
+| `xunit` | The runner. `[Fact]` by default, `[Theory]` for the cases described below. |
 | `xunit.runner.visualstudio` | Test discovery in the IDE. `PrivateAssets=all`. |
 | `Microsoft.NET.Test.Sdk` | Required for `dotnet test`. |
 | `Moq` | Mocking interfaces. |
@@ -40,14 +41,15 @@ project produce discovery ambiguity and a false impression of what the tests act
 
 ## Style inside test projects
 
-Test code deviates from the production conventions in one specific way: inside test projects,
-`var` and camelCase locals are the norm. The production rules require explicit types and
-PascalCase, and that stays true for production code. Tests are read top to bottom in a fixed
-Arrange, Act, Assert shape where the type of a local is rarely the question being asked, so the
-extra ceremony buys less than it does in a service.
+Test code deviates from the production conventions in one specific way, and it is not about types
+or casing: `// Arrange`, `// Act`, and `// Assert` are the only comments allowed anywhere in the
+solution, and they live here. They mark structure rather than explain code, which is why they
+survive a rule that otherwise admits no comments at all.
 
-Everything else carries over unchanged: one type per file, file scoped namespaces, no XML doc
-comments, no em dashes.
+Everything else carries over unchanged. `var` by default and an explicit type when the declared
+type carries weight, exactly as in production. camelCase for private fields, parameters, and
+locals, with no underscore prefix. One type per file, file scoped namespaces, no XML doc comments,
+no em dashes.
 
 ## Test project layout
 
@@ -99,21 +101,21 @@ twenty line test scannable in review.
 public async Task Create_ShouldReturnFailure_WhenReferenceAlreadyExists()
 {
     // Arrange
-    var order = _orderFaker.Generate();
-    var existingOrder = _orderFaker.Generate();
+    var order = orderFaker.Generate();
+    var existingOrder = orderFaker.Generate();
     existingOrder.Reference = order.Reference;
 
-    _orderRepository.Setup(x => x.Get(It.IsAny<object>())).ReturnsAsync(Result.Ok(existingOrder));
+    orderRepository.Setup(x => x.Get(It.IsAny<object>())).ReturnsAsync(Result.Ok(existingOrder));
 
     // Act
-    var result = await _service.Create(order);
+    var result = await service.Create(order);
 
     // Assert
     result.IsFailed.Should().BeTrue();
     result.Errors.Should().Contain(e => e.Message == "An order with this reference already exists");
 
-    _orderRepository.Verify(x => x.Get(It.IsAny<object>()), Times.Once);
-    _orderRepository.Verify(x => x.Insert(It.IsAny<Order>()), Times.Never);
+    orderRepository.Verify(x => x.Get(It.IsAny<object>()), Times.Once);
+    orderRepository.Verify(x => x.Insert(It.IsAny<Order>()), Times.Never);
 }
 ```
 
@@ -157,9 +159,9 @@ public async Task GetByDescriptions_ShouldHandleEmptyParameters_Gracefully(
     string category, string type, string detail)
 {
     // Arrange
-    var expectedOrders = _orderFaker.Generate(1);
+    var expectedOrders = orderFaker.Generate(1);
 
-    _iDbConnection.SetupDapperAsync(c =>
+    iDbConnection.SetupDapperAsync(c =>
         c.QueryAsync<Order>(
             "GetOrdersByDescriptions",
             It.IsAny<object>(),
@@ -169,13 +171,13 @@ public async Task GetByDescriptions_ShouldHandleEmptyParameters_Gracefully(
         )).ReturnsAsync(expectedOrders);
 
     // Act
-    var result = await _repository.GetByDescriptionsAsync(category, type, detail);
+    var result = await repository.GetByDescriptions(category, type, detail);
 
     // Assert
     result.Should().NotBeNull();
 
-    _context.Verify(x => x.CreateConnection(), Times.Once);
-    _retryPolicy.Verify(x => x.GetDbPolicy(), Times.Once);
+    context.Verify(x => x.CreateConnection(), Times.Once);
+    retryPolicy.Verify(x => x.GetDbPolicy(), Times.Once);
 }
 ```
 
@@ -184,9 +186,9 @@ method is a classifier and the rows document the classification:
 
 ```csharp
 [Theory]
-[InlineData("Sp", true)]     // professional service
-[InlineData("Unid", false)]  // unit
-[InlineData("kg", false)]    // kilogram
+[InlineData("Sp", true)]
+[InlineData("Unid", false)]
+[InlineData("kg", false)]
 public void DocumentLine_IsService_ShouldIdentifyCorrectly(string unitOfMeasure, bool expectedIsService)
 {
     // Arrange & Act
@@ -205,13 +207,13 @@ is about handling many items rather than about one specific value:
 [InlineData(1)]
 [InlineData(5)]
 [InlineData(10)]
-public async Task SaveAsync_ShouldPersistAllSuccessfully_WhenSavingMultipleOrders(int count)
+public async Task Save_ShouldPersistAllSuccessfully_WhenSavingMultipleOrders(int count)
 {
     // Arrange
-    var orders = _orderFaker.Generate(count);
+    var orders = orderFaker.Generate(count);
 
     // Act
-    var tasks = orders.Select(order => _repository.SaveAsync(order));
+    var tasks = orders.Select(order => repository.Save(order));
     var results = await Task.WhenAll(tasks);
 
     // Assert
@@ -220,7 +222,7 @@ public async Task SaveAsync_ShouldPersistAllSuccessfully_WhenSavingMultipleOrder
 
     foreach (var order in orders)
     {
-        var exists = await _repository.ExistsAsync(order.Key.Value);
+        var exists = await repository.Exists(order.Key.Value);
         exists.Should().BeTrue($"Order with key {order.Key.Value} should exist");
     }
 }
@@ -244,12 +246,12 @@ public async Task Handle_ShouldReturnNull_WhenReferenceIsMissing(string? orderRe
     var request = new GetOrderByReferenceQuery(orderReference, Guid.NewGuid());
 
     // Act
-    var result = await _handler.Handle(request, CancellationToken.None);
+    var result = await handler.Handle(request, CancellationToken.None);
 
     // Assert
     result.Should().BeNull();
 
-    _orderRepository.Verify(r => r.GetByReferenceAsync(It.IsAny<string>()), Times.Never);
+    orderRepository.Verify(r => r.GetByReference(It.IsAny<string>()), Times.Never);
 }
 ```
 
@@ -280,13 +282,13 @@ while every case asserts the same property, is fine:
 public async Task Repository_ShouldUseCorrectStoredProcedureName_ForEachMethod(string expectedStoredProcName)
 {
     // Arrange
-    var orders = _orderFaker.Generate(1);
+    var orders = orderFaker.Generate(1);
 
-    _iDbConnection.SetupDapperAsync(c =>
+    iDbConnection.SetupDapperAsync(c =>
         c.QueryAsync<Order>(expectedStoredProcName, It.IsAny<object>(), null, null, CommandType.StoredProcedure))
         .ReturnsAsync(orders);
 
-    _iDbConnection.SetupDapperAsync(c =>
+    iDbConnection.SetupDapperAsync(c =>
         c.QuerySingleOrDefaultAsync<Order>(expectedStoredProcName, It.IsAny<object>(), null, null, CommandType.StoredProcedure))
         .ReturnsAsync(orders.First());
 
@@ -294,18 +296,18 @@ public async Task Repository_ShouldUseCorrectStoredProcedureName_ForEachMethod(s
     switch (expectedStoredProcName)
     {
         case "GetAllOrders":
-            await _repository.GetAllAsync();
+            await repository.GetAll();
             break;
         case "GetOrderById":
-            await _repository.GetByIdAsync(Guid.NewGuid().ToString());
+            await repository.GetById(Guid.NewGuid().ToString());
             break;
         case "GetOrdersByCustomer":
-            await _repository.GetByCustomerAsync("customer-1");
+            await repository.GetByCustomer("customer-1");
             break;
     }
 
-    _context.Verify(x => x.CreateConnection(), Times.Once);
-    _retryPolicy.Verify(x => x.GetDbPolicy(), Times.Once);
+    context.Verify(x => x.CreateConnection(), Times.Once);
+    retryPolicy.Verify(x => x.GetDbPolicy(), Times.Once);
 }
 ```
 
@@ -337,10 +339,10 @@ AwesomeAssertions exclusively. Never `Assert.Equal` or any other native xUnit as
 though xUnit is the runner.
 
 ```csharp
-Result.IsSuccess.Should().BeTrue();
-Result.Value.Id.Should().Be(InsertedId);
-Result.Value.Should().OnlyContain(x => x.CustomerId == _customerId);
-UpdatedOrder.Value.UpdatedOn.Should().BeCloseTo(DateTime.UtcNow, TimeSpan.FromMinutes(1));
+result.IsSuccess.Should().BeTrue();
+result.Value.Id.Should().Be(insertedId);
+result.Value.Should().OnlyContain(x => x.CustomerId == customerId);
+updatedOrder.Value.UpdatedOn.Should().BeCloseTo(DateTime.UtcNow, TimeSpan.FromMinutes(1));
 ```
 
 How failure is asserted depends on how the layer signals it, and the two layers signal
@@ -383,19 +385,21 @@ immutable. `RuleFor` cannot reach a constructor only type, so these need `Custom
 and the wiring is usually specific enough to one test class that promoting it to `Tests.Common`
 buys nothing.
 
+`Tests.Common/Interfaces/IFaker.cs`
+
 ```csharp
-// Tests.Common/Interfaces/IFaker.cs
 namespace Acme.Product.Tests.Common.Interfaces;
 
 public interface IFaker<T> where T : class
 {
     T Generate();
-    List<T> Generate(int Count = 5);
+    List<T> Generate(int count = 5);
 }
 ```
 
+`Tests.Common/DataFakers/FakerBase.cs`
+
 ```csharp
-// Tests.Common/DataFakers/FakerBase.cs
 using Bogus;
 using Acme.Product.Tests.Common.Interfaces;
 
@@ -403,16 +407,17 @@ namespace Acme.Product.Tests.Common.DataFakers;
 
 public abstract class FakerBase<T> : IFaker<T> where T : class
 {
-    internal Faker<T> _faker = null!;
+    internal Faker<T> faker = null!;
 
-    public T Generate() => _faker.Generate();
-    public List<T> Generate(int Count = 5) => _faker.Generate(Count);
-    public virtual List<T> Generate(int Count, int StartIndex = 0) => _faker.Generate(Count);
+    public T Generate() => faker.Generate();
+    public List<T> Generate(int count = 5) => faker.Generate(count);
+    public virtual List<T> Generate(int count, int startIndex = 0) => faker.Generate(count);
 }
 ```
 
+`Tests.Common/DataFakers/Entities/OrderFaker.cs`
+
 ```csharp
-// Tests.Common/DataFakers/Entities/OrderFaker.cs
 using Bogus;
 using Acme.Product.Domain.Entities;
 
@@ -422,7 +427,7 @@ public class OrderFaker : FakerBase<Order>
 {
     public OrderFaker()
     {
-        _faker = new Faker<Order>()
+        faker = new Faker<Order>()
             .RuleFor(x => x.Id, f => f.Random.Long(1, 999999))
             .RuleFor(x => x.EntityKey, f => Guid.NewGuid())
             .RuleFor(x => x.Reference, f => f.Commerce.Ean13())
@@ -439,7 +444,7 @@ called from the constructor:
 ```csharp
 private void SetupFakers()
 {
-    _issuerFaker = new Faker<Issuer>()
+    issuerFaker = new Faker<Issuer>()
         .CustomInstantiator(f => new Issuer(
             name: f.Company.CompanyName(),
             identification: new Identification(f.PickRandom<IdentificationType>(), f.Random.Replace("##########")),
@@ -447,20 +452,19 @@ private void SetupFakers()
             address: GenerateAddress(f),
             contactInfo: GenerateContactInfo(f)));
 
-    _invoiceFaker = new Faker<Invoice>()
+    invoiceFaker = new Faker<Invoice>()
         .CustomInstantiator(f =>
         {
-            var issuer = _issuerFaker.Generate();
+            var issuer = issuerFaker.Generate();
             var invoice = new Invoice(
                 key: DocumentKey.Generate(f.Date.Recent(), issuer.Identification),
                 consecutiveNumber: f.Random.Replace("####################"),
                 issueDate: f.Date.Recent(),
                 issuer: issuer);
 
-            // exercise the optional paths too, so the fixture is not always the happy shape
             if (f.Random.Bool(0.8f))
             {
-                invoice.AddLine(_documentLineFaker.Generate());
+                invoice.AddLine(documentLineFaker.Generate());
             }
 
             return invoice;
@@ -469,7 +473,7 @@ private void SetupFakers()
 ```
 
 Two details worth copying. Composed fakers call each other rather than duplicating rules, so
-`_invoiceFaker` generates its issuer through `_issuerFaker`. And probabilistic branches inside
+`invoiceFaker` generates its issuer through `issuerFaker`. And probabilistic branches inside
 `CustomInstantiator`, like adding a tax to eighty percent of lines, keep the generated fixtures
 from all being the same happy shape.
 
@@ -493,16 +497,16 @@ every `ILogger<T>`. Loose mocking, never `MockBehavior.Strict`. Strict mocks tur
 production change into a test failure, which trains people to stop reading failures.
 
 ```csharp
-_orderRepository.Setup(x => x.Get(It.IsAny<object>())).ReturnsAsync(Result.Ok(ExistingOrder));
-_orderRepository.Verify(x => x.Insert(It.IsAny<Order>()), Times.Once);
+orderRepository.Setup(x => x.Get(It.IsAny<object>())).ReturnsAsync(Result.Ok(existingOrder));
+orderRepository.Verify(x => x.Insert(It.IsAny<Order>()), Times.Once);
 ```
 
 Callback style setups where the mock has to invoke a delegate it was handed:
 
 ```csharp
-_cacheService
+cacheService
     .Setup(x => x.GetOrCreate(It.IsAny<string>(), It.IsAny<TimeSpan>(), It.IsAny<Func<Task<List<string>>>>()))
-    .Returns<string, TimeSpan, Func<Task<List<string>>>>((Key, Ttl, Factory) => Factory());
+    .Returns<string, TimeSpan, Func<Task<List<string>>>>((key, ttl, factory) => factory());
 ```
 
 **Repositories that own their SQL: mock nothing.** Do not mock `IDbConnection` and do not use a
@@ -544,11 +548,11 @@ whole class rather than of a single method. Write these once per repository:
 public async Task Repository_ShouldEnsureConnectionIsDisposed_AfterOperation()
 {
     // Arrange
-    var order = _orderFaker.Generate();
+    var order = orderFaker.Generate();
     var disposableConnection = new Mock<IDbConnection>();
     disposableConnection.As<IDisposable>();
 
-    _context.Setup(c => c.CreateConnection()).Returns(disposableConnection.Object);
+    context.Setup(c => c.CreateConnection()).Returns(disposableConnection.Object);
 
     disposableConnection.SetupDapperAsync(c =>
         c.ExecuteAsync(
@@ -560,7 +564,7 @@ public async Task Repository_ShouldEnsureConnectionIsDisposed_AfterOperation()
         )).ReturnsAsync(1);
 
     // Act
-    await _repository.InsertAsync(order);
+    await repository.Insert(order);
 
     // Assert
     disposableConnection.As<IDisposable>().Verify(x => x.Dispose(), Times.Once);
@@ -579,13 +583,13 @@ test is that this exact SQL runs on that exact engine.
 ```csharp
 public class DocumentRepositoryTests : IAsyncLifetime
 {
-    private readonly SqlServerContainer _sqlServerContainer;
-    private IDbConnection _connection = null!;
-    private DocumentRepository _repository = null!;
+    private readonly SqlServerContainer sqlServerContainer;
+    private IDbConnection connection = null!;
+    private DocumentRepository repository = null!;
 
     public DocumentRepositoryTests()
     {
-        _sqlServerContainer = new SqlServerBuilder()
+        sqlServerContainer = new SqlServerBuilder()
             .WithPassword("YourStrong!Passw0rd")
             .WithCleanUp(true)
             .Build();
@@ -595,22 +599,22 @@ public class DocumentRepositoryTests : IAsyncLifetime
 
     public async Task InitializeAsync()
     {
-        await _sqlServerContainer.StartAsync();
+        await sqlServerContainer.StartAsync();
 
-        var connectionString = _sqlServerContainer.GetConnectionString();
-        _connection = new SqlConnection(connectionString);
-        await _connection.OpenAsync();
+        var connectionString = sqlServerContainer.GetConnectionString();
+        connection = new SqlConnection(connectionString);
+        await connection.OpenAsync();
 
         await CreateTestSchema();
 
         var logger = new Mock<ILogger<DocumentRepository>>().Object;
-        _repository = new DocumentRepository(_connection, logger);
+        repository = new DocumentRepository(connection, logger);
     }
 
     public async Task DisposeAsync()
     {
-        _connection?.Dispose();
-        await _sqlServerContainer.DisposeAsync();
+        connection?.Dispose();
+        await sqlServerContainer.DisposeAsync();
     }
 }
 ```
@@ -627,7 +631,7 @@ Rules that follow:
   and must not depend on ordering. When a test needs a clean slate, it generates its own keys
   rather than truncating tables.
 - Assert by reading back. Save, then fetch, then compare the fields that matter. A repository test
-  that only checks the return value of `SaveAsync` has not proven anything landed.
+  that only checks the return value of `Save` has not proven anything landed.
 - Mock the logger and nothing else. Every other collaborator in a repository test is real.
 
 ## Controller tests
@@ -640,13 +644,13 @@ memory host. Set `ControllerContext` by hand when the action reads from the requ
 public async Task Create_ShouldReturnStatusCode201_WhenSuccessful()
 {
     // Arrange
-    var request = _orderRequestFaker.Generate();
-    var createdOrder = _orderInfoFaker.Generate();
+    var request = orderRequestFaker.Generate();
+    var createdOrder = orderInfoFaker.Generate();
 
-    _orderService.Setup(x => x.Create(It.IsAny<Order>())).ReturnsAsync(Result.Ok(createdOrder));
+    orderService.Setup(x => x.Create(It.IsAny<Order>())).ReturnsAsync(Result.Ok(createdOrder));
 
     // Act
-    var result = await _controller.Create(request);
+    var result = await controller.Create(request);
 
     // Assert
     result.Result.Should().BeOfType<CreatedAtActionResult>();
@@ -656,7 +660,7 @@ public async Task Create_ShouldReturnStatusCode201_WhenSuccessful()
     createdResult.ActionName.Should().Be(nameof(OrderController.GetById));
     createdResult.Value.Should().Be(createdOrder);
 
-    _orderService.Verify(x => x.Create(It.IsAny<Order>()), Times.Once);
+    orderService.Verify(x => x.Create(It.IsAny<Order>()), Times.Once);
 }
 ```
 
@@ -671,11 +675,11 @@ test, so the constructor is the per test setup and no attribute is needed.
 ```csharp
 public OrderServiceTests()
 {
-    _logger = new Mock<ILogger<OrderService>>();
-    _orderRepository = new Mock<IOrderRepository>();
-    _customerRepository = new Mock<ICustomerRepository>();
+    logger = new Mock<ILogger<OrderService>>();
+    orderRepository = new Mock<IOrderRepository>();
+    customerRepository = new Mock<ICustomerRepository>();
 
-    _service = new OrderService(_logger.Object, _orderRepository.Object, _customerRepository.Object);
+    service = new OrderService(logger.Object, orderRepository.Object, customerRepository.Object);
 }
 ```
 

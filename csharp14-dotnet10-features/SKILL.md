@@ -79,8 +79,10 @@ so adopting the new syntax is optional rather than a breaking change.
 the receiver is non null:
 
 ```csharp
-customer?.Age = newAge; // replaces: if (customer is not null) { customer.Age = newAge; }
+customer?.Age = newAge;
 ```
+
+That replaces `if (customer is not null) { customer.Age = newAge; }`.
 
 ### Partial members expanded
 
