@@ -39,6 +39,9 @@ the product or bounded context name. Replace both with your own.
 - No `var`. Always use explicit types. This applies to production code. Test projects are the one
   exception, where `var` and camelCase locals are the norm.
 - PascalCase for classes, methods, properties, fields, parameters, and locals.
+- One statement per line. A call, a fluent chain, a method signature, or a concatenation that fits
+  on one line stays on one line, however long it runs. Object and collection initializers and
+  constructor declarations are exempt: their braces and parameters stay open across lines.
 - No em dashes in comments or documentation. Use commas, periods, or restructured sentences.
 - Never change code that was not explicitly requested: no reformatting, no casing changes,
   no namespace style changes as a side effect of another edit.
@@ -548,6 +551,7 @@ Pipelines       # CI definitions, Dockerfiles, deployment manifests
 - No SQL string interpolation with runtime values. Parameters, always.
 - No `using Dapper;` outside Infrastructure.
 - No block-style namespaces.
+- No statement wrapped across lines when it fits on one, initializers and constructors aside.
 - No XML doc comments.
 - No separate catalog tables. Use the LookUp pattern.
 - No physical deletes. Soft delete via `IsDeleted`.
